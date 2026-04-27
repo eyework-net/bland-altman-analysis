@@ -1,5 +1,7 @@
 # Bland–Altman解析ツール
 
+ https://eyework-net.github.io/bland-altman-analysis/
+
 2つの測定法・検査法・評価法の**一致性（agreement）**を、ブラウザ上で簡単に解析できるHTMLツールです。  
 
 平均差（bias）、95%一致限界（Limits of Agreement）、Bland–Altman plot を自動作成し、結果の解釈コメントまで表示します。
