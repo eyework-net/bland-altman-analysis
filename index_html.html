@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bland–Altman解析ツール</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #d1d5db;
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --danger: #dc2626;
+      --ok: #059669;
+      --shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+    }
+
+    header {
+      background: linear-gradient(135deg, #1e3a8a, #2563eb);
+      color: #fff;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      letter-spacing: 0.02em;
+    }
+
+    header p {
+      margin: 0;
+      opacity: 0.92;
+      font-size: 1rem;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 28px auto 60px;
+      display: grid;
+      gap: 22px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+      padding: 24px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 22px;
+    }
+
+    @media (max-width: 880px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 1.25rem;
+      border-left: 5px solid var(--primary);
+      padding-left: 10px;
+    }
+
+    h3 {
+      margin: 20px 0 8px;
+      font-size: 1.05rem;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 270px;
+      resize: vertical;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.95rem;
+      line-height: 1.55;
+      background: #fbfdff;
+    }
+
+    textarea:focus, input:focus {
+      outline: 2px solid rgba(37, 99, 235, 0.2);
+      border-color: var(--primary);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      background: var(--primary);
+      color: white;
+      transition: 0.15s ease;
+    }
+
+    button:hover {
+      background: var(--primary-dark);
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    button.secondary:hover {
+      background: #d1d5db;
+    }
+
+    .small-note {
+      color: var(--muted);
+      font-size: 0.92rem;
+      margin-top: 10px;
+    }
+
+    .excel-guide {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 14px 0;
+    }
+
+    .excel-guide div {
+      border: 1px solid #dbeafe;
+      background: #eff6ff;
+      border-radius: 12px;
+      padding: 12px;
+      color: #1e3a8a;
+      font-size: 0.94rem;
+    }
+
+    @media (max-width: 640px) {
+      .excel-guide {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .result-box {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    @media (max-width: 640px) {
+      .result-box {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .metric {
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+      padding: 14px;
+      background: #fbfdff;
+    }
+
+    .metric .label {
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-bottom: 4px;
+    }
+
+    .metric .value {
+      font-size: 1.35rem;
+      font-weight: 800;
+    }
+
+    .interpretation {
+      border-radius: 14px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      padding: 14px;
+      margin-top: 16px;
+      white-space: pre-wrap;
+    }
+
+    .error {
+      color: var(--danger);
+      font-weight: 700;
+      margin-top: 10px;
+      display: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: auto;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 8px 6px;
+      text-align: right;
+    }
+
+    th:first-child, td:first-child {
+      text-align: left;
+    }
+
+    .table-wrap {
+      max-height: 340px;
+      overflow: auto;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      margin-top: 12px;
+    }
+
+    .footer-note {
+      color: var(--muted);
+      font-size: 0.9rem;
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    code {
+      background: #eef2ff;
+      color: #1e3a8a;
+      padding: 2px 5px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Bland–Altman解析ツール</h1>
+    <p>2つの測定法の一致性を、平均差・95%一致限界・散布図で確認する簡易解析ツール</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>データ入力</h2>
+      <p>
+        Excelなどの表計算ソフトで2列のデータを選択し、そのままコピー＆ペーストしてください。1列目をA、2列目をBとして解析します。
+        1行目の見出しはあってもなくても構いません。
+      </p>
+      <div class="excel-guide">
+        <div>
+          <strong>A列：測定法A</strong><br />
+          例：オートレフ値、新機種、検者A
+        </div>
+        <div>
+          <strong>B列：測定法B</strong><br />
+          例：自覚屈折値、従来機種、検者B
+        </div>
+      </div>
+      <textarea id="dataInput" spellcheck="false">A	B
+0.25	0.00
+0.50	0.25
+-0.25	-0.50
+1.00	0.75
+0.75	0.50
+-0.50	-0.25
+0.00	0.00
+1.25	1.00
+-0.75	-0.50
+0.50	0.00</textarea>
+      <div class="controls">
+        <button onclick="analyze()">解析する</button>
+        <button class="secondary" onclick="insertSample()">サンプルデータを挿入</button>
+        <button class="secondary" onclick="clearData()">クリア</button>
+        <button class="secondary" onclick="downloadPNG()">図をPNG保存</button>
+      </div>
+      <div class="small-note">
+        差は <code>A − B</code> として計算します。例：オートレフ値をA、自覚屈折値をBに入れると、「オートレフが自覚屈折よりどの程度ずれるか」を評価できます。
+      </div>
+      <div id="error" class="error"></div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>解析結果</h2>
+        <div class="result-box">
+          <div class="metric">
+            <div class="label">症例数</div>
+            <div class="value" id="nValue">-</div>
+          </div>
+          <div class="metric">
+            <div class="label">平均差 bias</div>
+            <div class="value" id="biasValue">-</div>
+          </div>
+          <div class="metric">
+            <div class="label">差の標準偏差 SD</div>
+            <div class="value" id="sdValue">-</div>
+          </div>
+          <div class="metric">
+            <div class="label">95%一致限界 LoA</div>
+            <div class="value" id="loaValue">-</div>
+          </div>
+        </div>
+        <div class="interpretation" id="interpretation">解析結果がここに表示されます。</div>
+      </div>
+
+      <div class="card">
+        <h2>Bland–Altman plot</h2>
+        <canvas id="plot" width="900" height="620"></canvas>
+        <div class="small-note">
+          横軸：2法の平均値　縦軸：差 A−B　実線：bias　破線：95%一致限界
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>計算データ</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>No.</th>
+              <th>A</th>
+              <th>B</th>
+              <th>平均値</th>
+              <th>差 A−B</th>
+            </tr>
+          </thead>
+          <tbody id="dataTable">
+            <tr><td colspan="5" style="text-align:center; color:#6b7280;">解析後に表示されます。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>使い方と解釈</h2>
+      <h3>この解析で見るもの</h3>
+      <p>
+        Bland–Altman解析は、2つの測定法がどの程度一致するかを評価する方法です。相関係数のように「一緒に増えるか」ではなく、
+        「実際にどれくらいずれるか」を確認します。
+      </p>
+      <h3>bias</h3>
+      <p>
+        biasは、2法の平均的なずれです。biasが正ならAがBより高く出る傾向、負ならAがBより低く出る傾向を示します。
+      </p>
+      <h3>95%一致限界</h3>
+      <p>
+        95%一致限界は、個々の測定値の差がどの範囲に収まりやすいかを示します。統計学的に有意かどうかよりも、
+        この範囲が臨床的に許容できるかを判断することが重要です。
+      </p>
+      <h3>注意点</h3>
+      <p>
+        本ツールは基本的なBland–Altman解析を行う簡易版です。左右眼を同時に含むデータ、繰り返し測定、測定値が大きくなるほど差が変化する比例誤差が疑われるデータでは、
+        より高度な解析が必要になる場合があります。
+      </p>
+    </section>
+
+    <div class="footer-note">
+      © eyework | Bland–Altman analysis basic tool
+    </div>
+  </main>
+
+  <script>
+    let latestResult = null;
+
+    function parseData(text) {
+      const rows = text
+        .trim()
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      if (rows.length < 2) {
+        throw new Error("2行以上のデータを入力してください。");
+      }
+
+      const data = [];
+
+      rows.forEach((row, index) => {
+        const cols = row.split(/[\t,]/).map(v => v.trim());
+        if (cols.length < 2) return;
+
+        const a = Number(cols[0]);
+        const b = Number(cols[1]);
+
+        if (Number.isFinite(a) && Number.isFinite(b)) {
+          data.push({ a, b, mean: (a + b) / 2, diff: a - b });
+        } else if (index !== 0) {
+          throw new Error(`${index + 1}行目に数値として読めない値があります。`);
+        }
+      });
+
+      if (data.length < 3) {
+        throw new Error("解析には少なくとも3組以上の数値データを入力してください。");
+      }
+
+      return data;
+    }
+
+    function mean(arr) {
+      return arr.reduce((sum, v) => sum + v, 0) / arr.length;
+    }
+
+    function sampleSD(arr) {
+      const m = mean(arr);
+      const variance = arr.reduce((sum, v) => sum + Math.pow(v - m, 2), 0) / (arr.length - 1);
+      return Math.sqrt(variance);
+    }
+
+    function analyze() {
+      const error = document.getElementById("error");
+      error.style.display = "none";
+      error.textContent = "";
+
+      try {
+        const data = parseData(document.getElementById("dataInput").value);
+        const diffs = data.map(d => d.diff);
+        const bias = mean(diffs);
+        const sd = sampleSD(diffs);
+        const loaUpper = bias + 1.96 * sd;
+        const loaLower = bias - 1.96 * sd;
+
+        latestResult = { data, bias, sd, loaUpper, loaLower };
+
+        document.getElementById("nValue").textContent = data.length;
+        document.getElementById("biasValue").textContent = formatNumber(bias);
+        document.getElementById("sdValue").textContent = formatNumber(sd);
+        document.getElementById("loaValue").textContent = `${formatNumber(loaLower)} ～ ${formatNumber(loaUpper)}`;
+
+        const outliers = data.filter(d => d.diff > loaUpper || d.diff < loaLower).length;
+        const loaWidth = loaUpper - loaLower;
+        let biasEval = Math.abs(bias) < 0.25 ? "平均差は小さく、系統誤差は比較的少ないと考えられます。" : Math.abs(bias) < 0.50 ? "平均差は軽度に認められ、一定の系統誤差が示唆されます。" : "平均差が大きく、2法間に明確な系統誤差があります。";
+        let widthEval = loaWidth < 0.50 ? "一致限界幅は狭く、個々の測定値のばらつきは小さい可能性があります。" : loaWidth < 1.00 ? "一致限界幅は中等度で、臨床用途に応じた判断が必要です。" : "一致限界幅が広く、個々の測定値の差が大きい可能性があります。";
+        let outlierEval = outliers === 0 ? "一致限界外の症例はありません。" : `${outliers}例が一致限界外に位置しています。外れ値の背景確認が推奨されます。`;
+
+        document.getElementById("interpretation").textContent =
+          `平均差（bias）は ${formatNumber(bias)} です。
+` +
+          `AはBに対して平均 ${formatNumber(Math.abs(bias))}${bias >= 0 ? "高く" : "低く"} 測定される傾向があります。
+` +
+          `95%一致限界は ${formatNumber(loaLower)} ～ ${formatNumber(loaUpper)}（幅 ${formatNumber(loaWidth)}）です。
+
+` +
+          `${biasEval}
+${widthEval}
+${outlierEval}
+
+` +
+          `最終判断は、この差が臨床的許容範囲内かどうかで行ってください。`;
+
+        updateTable(data);
+        drawPlot(latestResult);
+      } catch (e) {
+        error.textContent = e.message;
+        error.style.display = "block";
+      }
+    }
+
+    function formatNumber(value) {
+      return Number(value).toFixed(3).replace(/\.000$/, ".000");
+    }
+
+    function updateTable(data) {
+      const tbody = document.getElementById("dataTable");
+      tbody.innerHTML = "";
+      data.forEach((d, i) => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${i + 1}</td>
+          <td>${formatNumber(d.a)}</td>
+          <td>${formatNumber(d.b)}</td>
+          <td>${formatNumber(d.mean)}</td>
+          <td>${formatNumber(d.diff)}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function drawPlot(result) {
+      const canvas = document.getElementById("plot");
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      const margin = { left: 80, right: 30, top: 35, bottom: 75 };
+      const plotW = w - margin.left - margin.right;
+      const plotH = h - margin.top - margin.bottom;
+
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, w, h);
+
+      const xValues = result.data.map(d => d.mean);
+      const yValues = result.data.map(d => d.diff).concat([result.bias, result.loaUpper, result.loaLower]);
+
+      let xMin = Math.min(...xValues);
+      let xMax = Math.max(...xValues);
+      let yMin = Math.min(...yValues);
+      let yMax = Math.max(...yValues);
+
+      const xPad = (xMax - xMin || 1) * 0.12;
+      const yPad = (yMax - yMin || 1) * 0.18;
+      xMin -= xPad;
+      xMax += xPad;
+      yMin -= yPad;
+      yMax += yPad;
+
+      const xScale = x => margin.left + ((x - xMin) / (xMax - xMin)) * plotW;
+      const yScale = y => margin.top + plotH - ((y - yMin) / (yMax - yMin)) * plotH;
+
+      drawGrid(ctx, margin, plotW, plotH, xMin, xMax, yMin, yMax, xScale, yScale);
+
+      drawHorizontalLine(ctx, yScale(result.bias), "#2563eb", false, `bias ${formatNumber(result.bias)}`, margin, plotW);
+      drawHorizontalLine(ctx, yScale(result.loaUpper), "#dc2626", true, `Upper LoA ${formatNumber(result.loaUpper)}`, margin, plotW);
+      drawHorizontalLine(ctx, yScale(result.loaLower), "#dc2626", true, `Lower LoA ${formatNumber(result.loaLower)}`, margin, plotW);
+
+      result.data.forEach(d => {
+        const outlier = d.diff > result.loaUpper || d.diff < result.loaLower;
+        ctx.beginPath();
+        ctx.arc(xScale(d.mean), yScale(d.diff), outlier ? 6 : 5, 0, Math.PI * 2);
+        ctx.fillStyle = outlier ? "#dc2626" : "#111827";
+        ctx.fill();
+      });
+
+      ctx.fillStyle = "#111827";
+      ctx.font = "bold 22px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Bland–Altman plot", w / 2, 26);
+
+      ctx.font = "16px system-ui, sans-serif";
+      ctx.fillText("Mean of A and B", margin.left + plotW / 2, h - 24);
+
+      ctx.save();
+      ctx.translate(24, margin.top + plotH / 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText("Difference (A − B)", 0, 0);
+      ctx.restore();
+    }
+
+    function drawGrid(ctx, margin, plotW, plotH, xMin, xMax, yMin, yMax, xScale, yScale) {
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1;
+      ctx.font = "13px system-ui, sans-serif";
+      ctx.fillStyle = "#374151";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+
+      const xTicks = makeTicks(xMin, xMax, 6);
+      const yTicks = makeTicks(yMin, yMax, 6);
+
+      xTicks.forEach(t => {
+        const x = xScale(t);
+        ctx.beginPath();
+        ctx.moveTo(x, margin.top);
+        ctx.lineTo(x, margin.top + plotH);
+        ctx.stroke();
+        ctx.fillText(formatTick(t), x, margin.top + plotH + 8);
+      });
+
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      yTicks.forEach(t => {
+        const y = yScale(t);
+        ctx.beginPath();
+        ctx.moveTo(margin.left, y);
+        ctx.lineTo(margin.left + plotW, y);
+        ctx.stroke();
+        ctx.fillText(formatTick(t), margin.left - 8, y);
+      });
+
+      ctx.strokeStyle = "#111827";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(margin.left, margin.top, plotW, plotH);
+    }
+
+    function drawHorizontalLine(ctx, y, color, dashed, label, margin, plotW) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(dashed ? [9, 7] : []);
+      ctx.beginPath();
+      ctx.moveTo(margin.left, y);
+      ctx.lineTo(margin.left + plotW, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.font = "bold 13px system-ui, sans-serif";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(label, margin.left + plotW - 8, y - 5);
+      ctx.restore();
+    }
+
+    function makeTicks(min, max, count) {
+      const ticks = [];
+      const step = (max - min) / (count - 1);
+      for (let i = 0; i < count; i++) ticks.push(min + step * i);
+      return ticks;
+    }
+
+    function formatTick(v) {
+      if (Math.abs(v) >= 10) return v.toFixed(1);
+      return v.toFixed(2);
+    }
+
+    function insertSample() {
+      document.getElementById("dataInput").value = `A	B
+0.25	0.00
+0.50	0.25
+-0.25	-0.50
+1.00	0.75
+0.75	0.50
+-0.50	-0.25
+0.00	0.00
+1.25	1.00
+-0.75	-0.50
+0.50	0.00
+1.50	1.00
+-1.00	-0.75`;
+      analyze();
+    }
+
+    function clearData() {
+      document.getElementById("dataInput").value = "";
+      document.getElementById("nValue").textContent = "-";
+      document.getElementById("biasValue").textContent = "-";
+      document.getElementById("sdValue").textContent = "-";
+      document.getElementById("loaValue").textContent = "-";
+      document.getElementById("interpretation").textContent = "解析結果がここに表示されます。";
+      document.getElementById("dataTable").innerHTML = '<tr><td colspan="5" style="text-align:center; color:#6b7280;">解析後に表示されます。</td></tr>';
+      const canvas = document.getElementById("plot");
+      canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+      latestResult = null;
+    }
+
+    function downloadPNG() {
+      if (!latestResult) analyze();
+      const canvas = document.getElementById("plot");
+      const link = document.createElement("a");
+      link.download = "bland_altman_plot.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
+
+    window.addEventListener("load", analyze);
+  </script>
+</body>
+</html>
